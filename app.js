@@ -53,9 +53,12 @@
         return parts.join(" ");
     }
 
-    setText("voucher-code", firstParam(["voucherCode", "voucher", "code"]));
-    setText("mac-address", firstParam(["clientMac", "mac", "macAddress"]));
-    setText("ip-address", firstParam(["clientIp", "clientIP", "ipAddress", "ip"]));
+    var voucherCode = firstParam(["voucherCode", "voucher", "code"]);
+    var macAddress = firstParam(["clientMac", "mac", "macAddress"]);
+    var ipAddress = firstParam(["clientIp", "clientIP", "ipAddress", "ip"]);
+    setText("voucher-code", voucherCode);
+    setText("mac-address", macAddress);
+    setText("ip-address", ipAddress);
 
     var startedAtValue = firstParam(["startedAt", "startTime", "sessionStart"]);
     var expiresAtValue = firstParam(["expiresAt", "expiryTime", "expirationTime"]);
@@ -65,6 +68,21 @@
     var expiresAt = expiresAtValue ? new Date(expiresAtValue) : null;
     var initialRemaining = remainingValue !== "" && isFinite(Number(remainingValue)) ? Math.max(0, Number(remainingValue)) : null;
     var remainingReceivedAt = initialRemaining !== null ? Date.now() : null;
+    var sessionNote = document.getElementById("session-note");
+    var hasTimingData = !!startedAtValue || !!expiresAtValue || initialRemaining !== null;
+
+    if (!voucherCode && !macAddress && !ipAddress && !duration && !hasTimingData) {
+        sessionNote.textContent = "No session data was received. Open this page from the Omada post-login redirect.";
+        sessionNote.hidden = false;
+    } else {
+        var missingDetails = [];
+        if (!ipAddress) { missingDetails.push("the IP address"); }
+        if (!hasTimingData) { missingDetails.push("live session time"); }
+        if (missingDetails.length) {
+            sessionNote.textContent = "Omada did not send " + missingDetails.join(" or ") + ". This static page cannot retrieve those values on its own.";
+            sessionNote.hidden = false;
+        }
+    }
 
     if (startedAt && isNaN(startedAt.getTime())) { startedAt = null; }
     if (expiresAt && isNaN(expiresAt.getTime())) { expiresAt = null; }
