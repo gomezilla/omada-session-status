@@ -29,6 +29,24 @@
         return unit ? { amount: Number(match[1]), unit: unit } : null;
     }
 
+    function inferDuration(seconds) {
+        var units = [
+            { unit: "years", seconds: 31536000 },
+            { unit: "months", seconds: 2592000 },
+            { unit: "weeks", seconds: 604800 },
+            { unit: "days", seconds: 86400 },
+            { unit: "hours", seconds: 3600 },
+            { unit: "minutes", seconds: 60 }
+        ];
+        for (var index = 0; index < units.length; index++) {
+            var amount = seconds / units[index].seconds;
+            if (amount >= 1 && Math.abs(amount - Math.round(amount)) < 0.01) {
+                return { amount: Math.round(amount), unit: units[index].unit };
+            }
+        }
+        return { amount: Math.round(seconds / 3600 * 100) / 100, unit: "hours" };
+    }
+
     function addDuration(date, duration) {
         var result = new Date(date.getTime());
         if (duration.unit === "hours") { result.setHours(result.getHours() + duration.amount); }
@@ -53,23 +71,29 @@
         return parts.join(" ");
     }
 
-    var voucherCode = firstParam(["voucherCode", "voucher", "code"]);
+    var voucherCode = firstParam(["voucherCode", "voucher", "code", "username"]);
     var macAddress = firstParam(["clientMac", "mac", "macAddress"]);
     var ipAddress = firstParam(["clientIp", "clientIP", "ipAddress", "ip"]);
+    var timeUsedValue = firstParam(["timeUsed", "uptime", "usedSeconds"]);
     setText("voucher-code", voucherCode);
     setText("mac-address", macAddress);
     setText("ip-address", ipAddress);
 
     var startedAtValue = firstParam(["startedAt", "startTime", "sessionStart"]);
     var expiresAtValue = firstParam(["expiresAt", "expiryTime", "expirationTime"]);
-    var remainingValue = firstParam(["remainingSeconds", "timeRemainingSeconds"]);
+    var remainingValue = firstParam(["remainingSeconds", "timeRemainingSeconds", "timeLeft"]);
     var duration = parseDuration(firstParam(["duration", "validity", "timeLimit"]), firstParam(["durationUnit", "unit"]));
     var startedAt = startedAtValue ? new Date(startedAtValue) : null;
     var expiresAt = expiresAtValue ? new Date(expiresAtValue) : null;
+    var initialUsed = timeUsedValue !== "" && isFinite(Number(timeUsedValue)) ? Math.max(0, Number(timeUsedValue)) : null;
+    var usedReceivedAt = initialUsed !== null ? Date.now() : null;
     var initialRemaining = remainingValue !== "" && isFinite(Number(remainingValue)) ? Math.max(0, Number(remainingValue)) : null;
     var remainingReceivedAt = initialRemaining !== null ? Date.now() : null;
+    if (!duration && initialUsed !== null && initialRemaining !== null) {
+        duration = inferDuration(initialUsed + initialRemaining);
+    }
     var sessionNote = document.getElementById("session-note");
-    var hasTimingData = !!startedAtValue || !!expiresAtValue || initialRemaining !== null;
+    var hasTimingData = !!startedAtValue || !!expiresAtValue || initialUsed !== null || initialRemaining !== null;
 
     if (!voucherCode && !macAddress && !ipAddress && !duration && !hasTimingData) {
         sessionNote.textContent = "No session data was received. Open this page from the Omada post-login redirect.";
@@ -99,11 +123,11 @@
     var progress = document.querySelector(".progress-track");
     var progressFill = document.getElementById("progress-fill");
 
-    if (startedAt || initialRemaining !== null || expiresAt) {
+    if (startedAt || initialUsed !== null || initialRemaining !== null || expiresAt) {
         function updateTimers() {
             var now = Date.now();
             var remaining = expiresAt ? Math.max(0, (expiresAt.getTime() - now) / 1000) : initialRemaining !== null ? Math.max(0, initialRemaining - (now - remainingReceivedAt) / 1000) : null;
-            var used = startedAt ? Math.max(0, (now - startedAt.getTime()) / 1000) : null;
+            var used = startedAt ? Math.max(0, (now - startedAt.getTime()) / 1000) : initialUsed !== null ? initialUsed + (now - usedReceivedAt) / 1000 : null;
 
             if (used === null && duration && remaining !== null) {
                 var totals = { hours: 3600, days: 86400, weeks: 604800, months: 2592000, years: 31536000 };
