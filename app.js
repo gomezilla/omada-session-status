@@ -1,9 +1,10 @@
 (function() {
     var params = new URLSearchParams(window.location.search);
+    var fragmentParams = new URLSearchParams(window.location.hash.slice(1));
 
     function firstParam(names) {
         for (var index = 0; index < names.length; index++) {
-            var value = params.get(names[index]);
+            var value = fragmentParams.get(names[index]) || params.get(names[index]);
             if (value) { return value.trim(); }
         }
         return "";
